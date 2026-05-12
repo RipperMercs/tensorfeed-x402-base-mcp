@@ -1,0 +1,53 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "ai.tensorfeed/x402-base-mcp",
+  "title": "TensorFeed x402 Base Reader",
+  "description": "Read-only Base mainnet reader. Verifies x402 payment settlements + AFTA federation status.",
+  "version": "0.1.1",
+  "websiteUrl": "https://tensorfeed.ai/x402",
+  "repository": {
+    "url": "https://github.com/RipperMercs/tensorfeed-x402-base-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@tensorfeed/x402-base-mcp",
+      "version": "0.1.1",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TENSORFEED_RPC_URL",
+          "description": "Optional Base mainnet RPC endpoint (Alchemy, Infura, etc) for higher rate limits. Must match the allowlist in src/rpc/allowlist.ts; non-allowlisted URLs fall back to public Base RPC with a stderr warning. Defaults to https://mainnet.base.org if unset.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "categories": ["payments", "blockchain", "data"],
+      "tags": ["x402", "base", "usdc", "agent-payments", "afta", "verification", "read-only", "machine-payable", "stablecoin"],
+      "license": "MIT",
+      "premium": false,
+      "freeTools": [
+        "balance",
+        "usdc_balance",
+        "block_number",
+        "get_tx_receipt",
+        "call",
+        "recent_transfers",
+        "verify_x402_settlement",
+        "parse_x402_manifest",
+        "usdc_recent_payments_to",
+        "verify_afta_federation",
+        "tf_payment_lookup"
+      ]
+    }
+  }
+}

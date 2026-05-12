@@ -1,6 +1,7 @@
 {
   "name": "@tensorfeed/x402-base-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "mcpName": "ai.tensorfeed/x402-base-mcp",
   "description": "Read-only MCP server for x402 payment verification on Base mainnet. The x402 ecosystem's canonical chain reader, with AFTA federation helpers.",
   "type": "module",
   "main": "dist/index.js",
