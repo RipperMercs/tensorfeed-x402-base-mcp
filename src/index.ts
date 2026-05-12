@@ -26,12 +26,30 @@ import { safeRun } from './security/errors.js';
 import { sanitizeValue } from './security/sanitize.js';
 import { enforceResponseCap, MAX_RESPONSE_BYTES } from './security/limits.js';
 
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.3';
 
 const server = new McpServer({
   name: 'tensorfeed-x402-base-mcp',
   version: PACKAGE_VERSION,
 });
+
+/**
+ * Every tool in this package is read-only by construction. The package
+ * holds no private keys and broadcasts no transactions; every handler
+ * is a `view`/`getLogs` / outbound HTTP GET against allowlisted
+ * endpoints. These annotations satisfy the Anthropic Connectors
+ * Directory policy requirement that every tool carries either
+ * readOnlyHint: true OR destructiveHint: true.
+ *
+ * openWorldHint = true because results depend on external systems
+ * (Base mainnet RPC, publisher /.well-known/x402 endpoints, TensorFeed
+ * AFTA cert endpoint).
+ */
+const READ_ONLY_ANNOTATIONS = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: true,
+} as const;
 
 /**
  * Wraps a tool handler in:
@@ -68,6 +86,7 @@ server.registerTool(
     inputSchema: {
       address: z.string().describe('EVM address (0x-prefixed, checksummed)'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Get ETH balance' },
   },
   wrapTool((args) => balance({ address: args.address })),
 );
@@ -80,6 +99,7 @@ server.registerTool(
     inputSchema: {
       address: z.string().describe('EVM address (0x-prefixed, checksummed)'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Get USDC balance' },
   },
   wrapTool((args) => usdc_balance({ address: args.address })),
 );
@@ -90,6 +110,7 @@ server.registerTool(
     title: 'Get latest Base block number',
     description: 'Returns the latest block number on Base mainnet.',
     inputSchema: {},
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Get latest Base block number' },
   },
   wrapTool(() => block_number()),
 );
@@ -102,6 +123,7 @@ server.registerTool(
     inputSchema: {
       tx_hash: z.string().describe('32-byte tx hash (0x-prefixed)'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Get transaction receipt' },
   },
   wrapTool((args) => get_tx_receipt({ tx_hash: args.tx_hash })),
 );
@@ -115,6 +137,7 @@ server.registerTool(
       contract: z.string().describe('Contract address (0x-prefixed)'),
       data: z.string().describe('ABI-encoded calldata (0x-prefixed hex, up to 64 KB)'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Read-only contract call' },
   },
   wrapTool((args) => call({ contract: args.contract, data: args.data })),
 );
@@ -129,6 +152,7 @@ server.registerTool(
       blocks_back: z.number().optional().describe('How many blocks back to scan (1-10000, default 1000)'),
       direction: z.enum(['in', 'out', 'both']).optional().describe('Filter to incoming, outgoing, or both (default both)'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Recent USDC transfers touching an address' },
   },
   wrapTool((args) => recent_transfers({
     address: args.address,
@@ -149,6 +173,7 @@ server.registerTool(
       expected_recipient: z.string().describe('Expected payTo wallet (0x-prefixed, checksummed)'),
       expected_amount_usdc: z.union([z.string(), z.number()]).describe('Expected USDC amount, e.g. "0.02" or 0.02'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Verify an x402 payment settlement on Base' },
   },
   wrapTool((args) => verify_x402_settlement({
     tx_hash: args.tx_hash,
@@ -165,6 +190,7 @@ server.registerTool(
     inputSchema: {
       domain: z.string().describe('Bare hostname, e.g. "tensorfeed.ai" (no scheme or path)'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Fetch and parse a publisher\'s x402 manifest' },
   },
   wrapTool((args) => parse_x402_manifest({ domain: args.domain })),
 );
@@ -178,6 +204,7 @@ server.registerTool(
       address: z.string().describe('Recipient address (0x-prefixed)'),
       blocks_back: z.number().optional().describe('How many blocks back to scan (1-10000, default 1000)'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Recent USDC payments to an address' },
   },
   wrapTool((args) => usdc_recent_payments_to({
     address: args.address,
@@ -195,6 +222,7 @@ server.registerTool(
     inputSchema: {
       domain: z.string().describe('Bare hostname, e.g. "tensorfeed.ai"'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'AFTA certification check for a domain' },
   },
   wrapTool((args) => verify_afta_federation({ domain: args.domain })),
 );
@@ -207,6 +235,7 @@ server.registerTool(
     inputSchema: {
       tx_hash: z.string().describe('32-byte tx hash (0x-prefixed)'),
     },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Check if a tx was a USDC payment to TensorFeed' },
   },
   wrapTool((args) => tf_payment_lookup({ tx_hash: args.tx_hash })),
 );

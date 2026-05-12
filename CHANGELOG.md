@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3 - 2026-05-12
+
+Anthropic Connectors Directory readiness: add MCP tool annotations (`readOnlyHint: true`, `destructiveHint: false`, `openWorldHint: true`, plus title) to every tool. The 2026 Connectors Directory submission policy rejects 30% of servers for missing this exact metadata; this release unblocks listing.
+
+- Add `READ_ONLY_ANNOTATIONS` constant and apply to all 11 `server.registerTool` calls
+- No tool behavior change; every tool was already read-only by construction
+
 ## 0.1.2 - 2026-05-11
 
 Glama directory polish: add MCPB manifest, icon, mcpbignore, and CHANGELOG so the package can be installed via the MCPB bundle workflow and scored properly in third-party MCP catalogs. No runtime behavior changes.
