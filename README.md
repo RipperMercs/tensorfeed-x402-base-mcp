@@ -128,6 +128,7 @@ MIT
 
 ## Related
 
+- [@tensorfeed/mcp-server](https://www.npmjs.com/package/@tensorfeed/mcp-server) - companion package, the TensorFeed data MCP (news, status, models, benchmarks, premium endpoints). Same scope, complementary role: this server verifies x402 payments on-chain; mcp-server wraps the TF data API as MCP tools.
 - [TensorFeed](https://tensorfeed.ai) - AI ecosystem data layer
 - [TensorFeed developers](https://tensorfeed.ai/developers) - free + premium API for AI agents
 - [Agent Fair-Trade Agreement (AFTA)](https://tensorfeed.ai/agent-fair-trade) - open standard for honest agent commerce
