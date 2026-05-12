@@ -5,6 +5,8 @@ import {
   requireHexCalldata,
   requireDomain,
   requireUint,
+  requireHttpsUrl,
+  requireBase64,
   ValidationError,
 } from '../src/security/validate.js';
 import { sanitizeString, sanitizeValue, externalString } from '../src/security/sanitize.js';
@@ -133,6 +135,95 @@ describe('requireUint', () => {
 
   it('rejects non-integer', () => {
     expect(() => requireUint(1.5, 'blocks')).toThrow();
+  });
+});
+
+describe('requireHttpsUrl', () => {
+  it('accepts a plain https URL', () => {
+    expect(requireHttpsUrl('https://tensorfeed.ai/api/x402/status')).toBe(
+      'https://tensorfeed.ai/api/x402/status',
+    );
+  });
+
+  it('strips fragment', () => {
+    expect(requireHttpsUrl('https://tensorfeed.ai/x402#section')).toBe(
+      'https://tensorfeed.ai/x402',
+    );
+  });
+
+  it('rejects http://', () => {
+    expect(() => requireHttpsUrl('http://tensorfeed.ai')).toThrowError(ValidationError);
+  });
+
+  it('rejects file://', () => {
+    expect(() => requireHttpsUrl('file:///etc/passwd')).toThrow();
+  });
+
+  it('rejects javascript:', () => {
+    expect(() => requireHttpsUrl('javascript:alert(1)')).toThrow();
+  });
+
+  it('rejects localhost (SSRF)', () => {
+    expect(() => requireHttpsUrl('https://localhost/api')).toThrow();
+  });
+
+  it('rejects 127.0.0.1 (SSRF)', () => {
+    expect(() => requireHttpsUrl('https://127.0.0.1/api')).toThrow();
+  });
+
+  it('rejects 10.x private (SSRF)', () => {
+    expect(() => requireHttpsUrl('https://10.0.0.1/api')).toThrow();
+  });
+
+  it('rejects 192.168.x private (SSRF)', () => {
+    expect(() => requireHttpsUrl('https://192.168.1.5/api')).toThrow();
+  });
+
+  it('rejects 172.16-31.x private (SSRF)', () => {
+    expect(() => requireHttpsUrl('https://172.20.0.1/api')).toThrow();
+  });
+
+  it('rejects 169.254.x link-local (SSRF)', () => {
+    expect(() => requireHttpsUrl('https://169.254.169.254/latest/meta-data')).toThrow();
+  });
+
+  it('rejects raw single-label host', () => {
+    expect(() => requireHttpsUrl('https://internal/api')).toThrow();
+  });
+
+  it('rejects empty string', () => {
+    expect(() => requireHttpsUrl('')).toThrow();
+  });
+
+  it('rejects huge URL', () => {
+    expect(() => requireHttpsUrl('https://x.com/' + 'a'.repeat(3000))).toThrow();
+  });
+});
+
+describe('requireBase64', () => {
+  it('decodes standard base64', () => {
+    const buf = requireBase64(Buffer.from('hello world').toString('base64'));
+    expect(buf.toString('utf8')).toBe('hello world');
+  });
+
+  it('decodes URL-safe base64', () => {
+    const url = Buffer.from('hi?>').toString('base64')
+      .replace(/\+/g, '-').replace(/\//g, '_');
+    const buf = requireBase64(url);
+    expect(buf.toString('utf8')).toBe('hi?>');
+  });
+
+  it('rejects empty', () => {
+    expect(() => requireBase64('')).toThrowError(ValidationError);
+  });
+
+  it('rejects non-base64', () => {
+    expect(() => requireBase64('not!base64!@#')).toThrow();
+  });
+
+  it('rejects oversized decoded payload', () => {
+    const huge = Buffer.alloc(200 * 1024, 0x41).toString('base64');
+    expect(() => requireBase64(huge, 'payload', 64 * 1024)).toThrow();
   });
 });
 

@@ -29,7 +29,42 @@ import { USDC_ADDRESS, USDC_DECIMALS, ERC20_ABI, BASE_CAIP2 } from '../chains.js
 export const TF_PAYMENT_WALLET: Address = '0x549c82e6bFC54bdaE9A2073744CBC2AF5D1FC6D1';
 
 const TF_AFTA_CERT_ENDPOINT = 'https://tensorfeed.ai/api/afta-certify/check';
+const TF_X402_STATUS_ENDPOINT = 'https://tensorfeed.ai/api/x402/status';
 const FETCH_TIMEOUT_MS = 10_000;
+
+/**
+ * Known AFTA federation members. Hand-maintained list of domains the
+ * TensorFeed team has confirmed implement the Agent Fair-Trade Agreement
+ * with code-enforced no-charge guarantees and signed receipts.
+ *
+ * This is intentionally a static list rather than a network call: it is
+ * the curated answer to "who has TF actually federated with?" rather
+ * than "who has merely shipped /.well-known/x402.json?" Membership grows
+ * with package versions; agents that need the live discovery surface
+ * should call verify_afta_federation(domain) per-domain instead.
+ */
+const AFTA_FEDERATION_MEMBERS: ReadonlyArray<{
+  domain: string;
+  role: 'origin' | 'federated_member';
+  joined_at: string;
+  x402_manifest: string;
+  afta_certify_check: string;
+}> = [
+  {
+    domain: 'tensorfeed.ai',
+    role: 'origin',
+    joined_at: '2026-04-30',
+    x402_manifest: 'https://tensorfeed.ai/.well-known/x402.json',
+    afta_certify_check: 'https://tensorfeed.ai/api/afta-certify/check?domain=tensorfeed.ai',
+  },
+  {
+    domain: 'terminalfeed.io',
+    role: 'federated_member',
+    joined_at: '2026-05-08',
+    x402_manifest: 'https://terminalfeed.io/.well-known/x402.json',
+    afta_certify_check: 'https://tensorfeed.ai/api/afta-certify/check?domain=terminalfeed.io',
+  },
+];
 
 /**
  * verify_afta_federation
@@ -178,9 +213,112 @@ export async function tf_payment_lookup(args: { tx_hash: unknown }) {
   };
 }
 
+/**
+ * x402_publisher_health
+ *
+ * Calls TF's canonical x402 status endpoint and filters to one domain.
+ * Returns current outcome, recent series, and uptime stats. Used by
+ * agents picking a publisher: "is this x402-paid endpoint healthy
+ * enough to depend on right now?"
+ *
+ * TF runs an hourly cron probe across all known x402 publishers. The
+ * series array carries the last several days of checks. Each tick has
+ * outcome (ok, manifest_malformed, unreachable, timeout, http_error)
+ * and observed latency.
+ */
+export async function x402_publisher_health(args: { domain: unknown }) {
+  const domain = requireDomain(args.domain);
+  await rateLimit('x402_publisher_health');
+
+  return cached(
+    `x402_health:${domain}`,
+    CACHE_TTL.WELL_KNOWN,
+    async () => {
+      let res: Response;
+      try {
+        res = await fetch(TF_X402_STATUS_ENDPOINT, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': buildUserAgent(),
+          },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        });
+      } catch {
+        return { ok: false as const, error: 'status_endpoint_unreachable' };
+      }
+      if (!res.ok) {
+        return {
+          ok: false as const,
+          error: 'status_endpoint_error',
+          http_status: res.status,
+        };
+      }
+      let snapshot: unknown;
+      try {
+        snapshot = await res.json();
+      } catch {
+        return { ok: false as const, error: 'status_endpoint_bad_json' };
+      }
+      const snap = snapshot as
+        | { publishers?: unknown; generated_at?: unknown }
+        | null;
+      const publishers = snap && Array.isArray(snap.publishers) ? snap.publishers : null;
+      if (!publishers) {
+        return { ok: false as const, error: 'status_endpoint_missing_publishers' };
+      }
+      const match = publishers.find(
+        (p) =>
+          p &&
+          typeof p === 'object' &&
+          typeof (p as { domain?: unknown }).domain === 'string' &&
+          ((p as { domain: string }).domain as string).toLowerCase() === domain,
+      ) as Record<string, unknown> | undefined;
+      if (!match) {
+        return {
+          ok: true as const,
+          monitored: false,
+          domain,
+          note: 'TF does not currently monitor this domain. To request monitoring open an issue at https://github.com/RipperMercs/tensorfeed-x402-base-mcp/issues.',
+        };
+      }
+      return {
+        ok: true as const,
+        monitored: true,
+        domain,
+        source: TF_X402_STATUS_ENDPOINT,
+        generated_at:
+          snap && typeof snap.generated_at === 'string' ? snap.generated_at : null,
+        record: sanitizeValue(match),
+      };
+    },
+  );
+}
+
+/**
+ * afta_federation_members
+ *
+ * Returns the canonical list of confirmed AFTA federation members. This
+ * is a static list maintained in-package; the latest version always
+ * reflects the federation as of that package release. Agents that need
+ * to verify the live AFTA posture of any of these domains should chain
+ * the response through verify_afta_federation(domain).
+ */
+export async function afta_federation_members() {
+  return {
+    ok: true as const,
+    standard: 'AFTA (Agent Fair-Trade Agreement)',
+    standard_url: 'https://tensorfeed.ai/originals/agent-fair-trade-agreement',
+    member_count: AFTA_FEDERATION_MEMBERS.length,
+    members: AFTA_FEDERATION_MEMBERS.map((m) => ({ ...m })),
+    note: 'Static list maintained per package version. To check live cert status of any member, chain through verify_afta_federation(domain).',
+    last_updated_in_package: '2026-05-12',
+  };
+}
+
 function buildUserAgent(): string {
   const suffix = process.env.TENSORFEED_UA_SUFFIX
     ? ` ${sanitizeString(process.env.TENSORFEED_UA_SUFFIX, 64)}`
     : '';
-  return `tensorfeed-x402-base-mcp/0.1.0${suffix}`;
+  return `tensorfeed-x402-base-mcp/0.2.0${suffix}`;
 }

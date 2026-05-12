@@ -20,13 +20,25 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 import { balance, usdc_balance, block_number, get_tx_receipt, call, recent_transfers } from './tools/generic.js';
-import { verify_x402_settlement, parse_x402_manifest, usdc_recent_payments_to } from './tools/x402.js';
-import { verify_afta_federation, tf_payment_lookup, TF_PAYMENT_WALLET } from './tools/tf.js';
+import {
+  verify_x402_settlement,
+  parse_x402_manifest,
+  usdc_recent_payments_to,
+  probe_x402_endpoint,
+  decode_x402_payment_payload,
+} from './tools/x402.js';
+import {
+  verify_afta_federation,
+  tf_payment_lookup,
+  x402_publisher_health,
+  afta_federation_members,
+  TF_PAYMENT_WALLET,
+} from './tools/tf.js';
 import { safeRun } from './security/errors.js';
 import { sanitizeValue } from './security/sanitize.js';
 import { enforceResponseCap, MAX_RESPONSE_BYTES } from './security/limits.js';
 
-const PACKAGE_VERSION = '0.1.3';
+const PACKAGE_VERSION = '0.2.0';
 
 const server = new McpServer({
   name: 'tensorfeed-x402-base-mcp',
@@ -212,6 +224,32 @@ server.registerTool(
   })),
 );
 
+server.registerTool(
+  'probe_x402_endpoint',
+  {
+    title: 'Probe whether a URL is x402-paid',
+    description: 'Performs a GET against an https URL and reports whether the response looks like a canonical x402-paid endpoint (HTTP 402 with a JSON body containing accepts[]). Read-only. Does not pay, does not broadcast.',
+    inputSchema: {
+      url: z.string().describe('Absolute https:// URL to probe (no http, no file, no IP; rejects localhost/private network targets)'),
+    },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Probe whether a URL is x402-paid' },
+  },
+  wrapTool((args) => probe_x402_endpoint({ url: args.url })),
+);
+
+server.registerTool(
+  'decode_x402_payment_payload',
+  {
+    title: 'Decode an X-PAYMENT header payload',
+    description: 'Decodes a base64-encoded X-PAYMENT header payload per the Coinbase x402 V2 spec. Returns the parsed scheme, network, x402Version, EIP-3009 authorization, and signature. Pure offline decode; no signature is verified and no network call is made.',
+    inputSchema: {
+      payload: z.string().describe('Base64-encoded X-PAYMENT header value (standard or URL-safe). Decoded size capped at 64 KB.'),
+    },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Decode an X-PAYMENT header payload' },
+  },
+  wrapTool((args) => decode_x402_payment_payload({ payload: args.payload })),
+);
+
 // ---------- TF-flavor tools ----------
 
 server.registerTool(
@@ -238,6 +276,30 @@ server.registerTool(
     annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Check if a tx was a USDC payment to TensorFeed' },
   },
   wrapTool((args) => tf_payment_lookup({ tx_hash: args.tx_hash })),
+);
+
+server.registerTool(
+  'x402_publisher_health',
+  {
+    title: 'Health and uptime of an x402 publisher',
+    description: 'Returns the latest x402 status snapshot for a given domain from TensorFeed\'s canonical hourly monitor: current outcome, latency, 24h/7d uptime, and the recent series of check results. Useful for agents picking which paid publisher to depend on.',
+    inputSchema: {
+      domain: z.string().describe('Bare hostname, e.g. "tensorfeed.ai" (no scheme or path)'),
+    },
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'Health and uptime of an x402 publisher' },
+  },
+  wrapTool((args) => x402_publisher_health({ domain: args.domain })),
+);
+
+server.registerTool(
+  'afta_federation_members',
+  {
+    title: 'List confirmed AFTA federation members',
+    description: 'Returns the canonical list of confirmed Agent Fair-Trade Agreement (AFTA) federation members as of this package version. Static curated list; chain through verify_afta_federation(domain) to confirm live cert posture per member.',
+    inputSchema: {},
+    annotations: { ...READ_ONLY_ANNOTATIONS, title: 'List confirmed AFTA federation members' },
+  },
+  wrapTool(() => afta_federation_members()),
 );
 
 // ---------- stdio bootstrap ----------

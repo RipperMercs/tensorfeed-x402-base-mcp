@@ -24,6 +24,8 @@ import {
   requireAddress,
   requireDomain,
   requireUint,
+  requireHttpsUrl,
+  requireBase64,
 } from '../security/validate.js';
 import { sanitizeString, sanitizeValue, externalString } from '../security/sanitize.js';
 import { getClient, cached, rateLimit, CACHE_TTL } from '../rpc/client.js';
@@ -278,9 +280,207 @@ export async function usdc_recent_payments_to(args: {
   };
 }
 
+/**
+ * probe_x402_endpoint
+ *
+ * Given a URL, fetches it (GET) and reports whether the response looks
+ * like a canonical x402-paid endpoint: HTTP 402 status, a JSON body with
+ * an `accepts[]` array containing well-formed payment requirements.
+ *
+ * This is the "is this URL machine-payable?" probe. Useful for an agent
+ * that has been handed a URL by a user and wants to know whether to
+ * negotiate payment or treat it as a regular request.
+ *
+ * Does NOT pay. Does NOT broadcast. Pure read.
+ */
+export async function probe_x402_endpoint(args: { url: unknown }) {
+  const url = requireHttpsUrl(args.url);
+  await rateLimit('probe_x402_endpoint');
+
+  return cached(`probe_x402:${url}`, CACHE_TTL.WELL_KNOWN, async () => {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': buildUserAgent(),
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        redirect: 'manual',
+      });
+    } catch (e) {
+      const reason = e instanceof Error ? e.name : 'fetch_failed';
+      return {
+        ok: true as const,
+        probed_url: url,
+        x402_paid: false,
+        reason: `fetch_error:${reason}`,
+      };
+    }
+
+    const status = res.status;
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+
+    if (status !== 402) {
+      return {
+        ok: true as const,
+        probed_url: url,
+        x402_paid: false,
+        reason: 'http_status_not_402',
+        http_status: status,
+      };
+    }
+
+    if (!ct.includes('json')) {
+      return {
+        ok: true as const,
+        probed_url: url,
+        x402_paid: 'unclear' as const,
+        reason: 'status_402_but_no_json_body',
+        http_status: status,
+        content_type: ct || null,
+      };
+    }
+
+    const text = await res.text();
+    if (text.length > 64 * 1024) {
+      return {
+        ok: true as const,
+        probed_url: url,
+        x402_paid: 'unclear' as const,
+        reason: 'body_too_large_to_parse',
+        http_status: status,
+      };
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return {
+        ok: true as const,
+        probed_url: url,
+        x402_paid: 'unclear' as const,
+        reason: 'body_not_json',
+        http_status: status,
+      };
+    }
+
+    const b = body as Record<string, unknown> | null;
+    const accepts = b && Array.isArray((b as { accepts?: unknown }).accepts)
+      ? ((b as { accepts: unknown[] }).accepts)
+      : null;
+    if (!accepts || accepts.length === 0) {
+      return {
+        ok: true as const,
+        probed_url: url,
+        x402_paid: 'unclear' as const,
+        reason: '402_body_missing_accepts',
+        http_status: status,
+        body_preview: sanitizeValue(body),
+      };
+    }
+
+    return {
+      ok: true as const,
+      probed_url: url,
+      x402_paid: true,
+      http_status: status,
+      x402_version: (b && typeof (b as { x402Version?: unknown }).x402Version === 'number')
+        ? (b as { x402Version: number }).x402Version
+        : null,
+      accepts_count: accepts.length,
+      accepts: sanitizeValue(accepts),
+    };
+  });
+}
+
+/**
+ * decode_x402_payment_payload
+ *
+ * Decodes a base64-encoded X-PAYMENT header value (per Coinbase x402 V2
+ * spec). The payload is base64-encoded JSON containing `scheme`, `network`,
+ * `x402Version`, and a scheme-specific `payload` (for EIP-3009 / exact:
+ * `signature`, `authorization{from,to,value,validAfter,validBefore,nonce}`).
+ *
+ * Returns the parsed structure. Does NOT verify any signature, does NOT
+ * make any network call. Pure offline decode for debugging and auditing.
+ */
+export async function decode_x402_payment_payload(args: { payload: unknown }) {
+  const decoded = requireBase64(args.payload, 'payload');
+  let text: string;
+  try {
+    text = decoded.toString('utf8');
+  } catch {
+    return {
+      ok: false as const,
+      error: 'validation_failed',
+      details: { field: 'payload', code: 'not-utf8' },
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return {
+      ok: false as const,
+      error: 'validation_failed',
+      details: { field: 'payload', code: 'not-json' },
+    };
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {
+      ok: false as const,
+      error: 'validation_failed',
+      details: { field: 'payload', code: 'not-an-object' },
+    };
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  const scheme = typeof obj.scheme === 'string' ? obj.scheme : null;
+  const network = typeof obj.network === 'string' ? obj.network : null;
+  const version = typeof obj.x402Version === 'number' ? obj.x402Version : null;
+  const inner = obj.payload && typeof obj.payload === 'object'
+    ? (obj.payload as Record<string, unknown>)
+    : null;
+
+  let auth = null as null | Record<string, unknown>;
+  let signature: string | null = null;
+  if (inner) {
+    if (inner.authorization && typeof inner.authorization === 'object') {
+      auth = inner.authorization as Record<string, unknown>;
+    }
+    if (typeof inner.signature === 'string') signature = inner.signature;
+  }
+
+  const shapeHints: string[] = [];
+  if (!scheme) shapeHints.push('missing-scheme');
+  if (!network) shapeHints.push('missing-network');
+  if (version === null) shapeHints.push('missing-x402Version');
+  if (!auth) shapeHints.push('missing-payload.authorization');
+  if (!signature) shapeHints.push('missing-payload.signature');
+
+  return {
+    ok: true as const,
+    decoded_bytes: decoded.length,
+    x402_version: version,
+    scheme,
+    network,
+    authorization: auth ? sanitizeValue(auth) : null,
+    signature: signature ? sanitizeValue(signature) : null,
+    raw: sanitizeValue(parsed),
+    canonical_shape_ok: shapeHints.length === 0,
+    shape_warnings: shapeHints,
+    note: 'This is a structural decode only. No signature is verified and no network call is made. To verify the on-chain settlement after the agent paid, use verify_x402_settlement with the returned tx hash.',
+  };
+}
+
 function buildUserAgent(): string {
   const suffix = process.env.TENSORFEED_UA_SUFFIX
     ? ` ${sanitizeString(process.env.TENSORFEED_UA_SUFFIX, 64)}`
     : '';
-  return `tensorfeed-x402-base-mcp/0.1.0${suffix}`;
+  return `tensorfeed-x402-base-mcp/0.2.0${suffix}`;
 }

@@ -3,7 +3,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { verify_afta_federation, tf_payment_lookup, TF_PAYMENT_WALLET } from '../src/tools/tf.js';
+import {
+  verify_afta_federation,
+  tf_payment_lookup,
+  x402_publisher_health,
+  afta_federation_members,
+  TF_PAYMENT_WALLET,
+} from '../src/tools/tf.js';
 import { _resetCache } from '../src/rpc/client.js';
 
 const SKIP_LIVE = process.env.VITEST_SKIP_LIVE === '1';
@@ -55,6 +61,40 @@ describe.skipIf(SKIP_LIVE)('tf_payment_lookup (live)', () => {
   }, 20_000);
 });
 
+describe.skipIf(SKIP_LIVE)('x402_publisher_health (live)', () => {
+  it('returns a structured record for tensorfeed.ai', async () => {
+    _resetCache();
+    const result = await x402_publisher_health({ domain: 'tensorfeed.ai' });
+    expect(result.ok).toBe(true);
+    if (result.ok && 'monitored' in result && result.monitored) {
+      expect((result as { record: unknown }).record).toBeTruthy();
+    }
+  }, 20_000);
+
+  it('returns monitored=false for an unknown domain', async () => {
+    _resetCache();
+    const result = await x402_publisher_health({ domain: 'definitely-not-monitored.example' });
+    expect(result.ok).toBe(true);
+    if (result.ok && 'monitored' in result) {
+      expect(result.monitored).toBe(false);
+    }
+  }, 20_000);
+});
+
+describe('afta_federation_members (pure)', () => {
+  it('returns the federation list with TF as origin', async () => {
+    const result = await afta_federation_members();
+    expect(result.ok).toBe(true);
+    expect(result.member_count).toBeGreaterThanOrEqual(2);
+    const tf = result.members.find((m) => m.domain === 'tensorfeed.ai');
+    expect(tf).toBeTruthy();
+    expect(tf!.role).toBe('origin');
+    const term = result.members.find((m) => m.domain === 'terminalfeed.io');
+    expect(term).toBeTruthy();
+    expect(term!.role).toBe('federated_member');
+  });
+});
+
 describe('TF tools (input validation)', () => {
   it('verify_afta_federation rejects URL input', async () => {
     await expect(verify_afta_federation({ domain: 'https://evil.example' })).rejects.toThrow();
@@ -62,5 +102,9 @@ describe('TF tools (input validation)', () => {
 
   it('tf_payment_lookup rejects malformed tx hash', async () => {
     await expect(tf_payment_lookup({ tx_hash: '0xbad' })).rejects.toThrow();
+  });
+
+  it('x402_publisher_health rejects URL input', async () => {
+    await expect(x402_publisher_health({ domain: 'https://evil.example' })).rejects.toThrow();
   });
 });

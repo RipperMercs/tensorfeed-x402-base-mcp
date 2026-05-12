@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 - 2026-05-12
+
+Four new tools for agents that want to negotiate x402 payments more intelligently and pick healthy publishers.
+
+- `probe_x402_endpoint(url)` — fetch any https URL and report whether the response looks like canonical x402 (HTTP 402 + JSON body with `accepts[]`). Read-only probe; never pays, never broadcasts. SSRF-hardened (refuses http://, file://, raw IPs, loopback, private network ranges).
+- `decode_x402_payment_payload(payload)` — offline decode of a base64 X-PAYMENT header per the Coinbase x402 V2 spec. Returns parsed `scheme`, `network`, `x402Version`, EIP-3009 `authorization`, and `signature`, plus shape-warning flags for non-canonical inputs. Pure offline; no network calls, no signature verification.
+- `x402_publisher_health(domain)` — fetches TensorFeed's canonical hourly status snapshot and returns the per-publisher record: current outcome, latency, 24h/7d uptime, recent series. Returns `monitored: false` for domains TF does not yet probe.
+- `afta_federation_members()` — static curated list of confirmed AFTA federation members (TensorFeed origin + TerminalFeed). Each entry includes the domain's role, join date, x402 manifest URL, and AFTA cert-check URL.
+- New `requireHttpsUrl` and `requireBase64` validators in `src/security/validate.ts`. SSRF guard refuses loopback, private network, link-local, and bare single-label hostnames.
+- 98 tests pass (up from 83). Live integration tests skipped under `VITEST_SKIP_LIVE=1`.
+- Tool count: 11 → 15. All new tools annotated `readOnlyHint: true`, `destructiveHint: false`, `openWorldHint: true`.
+
 ## 0.1.3 - 2026-05-12
 
 Anthropic Connectors Directory readiness: add MCP tool annotations (`readOnlyHint: true`, `destructiveHint: false`, `openWorldHint: true`, plus title) to every tool. The 2026 Connectors Directory submission policy rejects 30% of servers for missing this exact metadata; this release unblocks listing.

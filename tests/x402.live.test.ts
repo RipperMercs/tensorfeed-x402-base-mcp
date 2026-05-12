@@ -9,6 +9,8 @@ import {
   verify_x402_settlement,
   parse_x402_manifest,
   usdc_recent_payments_to,
+  probe_x402_endpoint,
+  decode_x402_payment_payload,
 } from '../src/tools/x402.js';
 import { _resetCache } from '../src/rpc/client.js';
 
@@ -96,6 +98,85 @@ describe.skipIf(SKIP_LIVE)('usdc_recent_payments_to (live)', () => {
   }, 30_000);
 });
 
+describe.skipIf(SKIP_LIVE)('probe_x402_endpoint (live)', () => {
+  it('returns x402_paid=true for a known x402-paid TF endpoint', async () => {
+    _resetCache();
+    const result = await probe_x402_endpoint({
+      url: 'https://tensorfeed.ai/api/premium/news/search?q=ai',
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok && 'x402_paid' in result) {
+      // Be lenient: this endpoint should return 402 with accepts[]
+      expect(result.x402_paid === true || result.x402_paid === 'unclear').toBe(true);
+    }
+  }, 20_000);
+
+  it('returns x402_paid=false for a free endpoint', async () => {
+    _resetCache();
+    const result = await probe_x402_endpoint({
+      url: 'https://tensorfeed.ai/api/meta',
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok && 'x402_paid' in result) {
+      expect(result.x402_paid).toBe(false);
+    }
+  }, 20_000);
+});
+
+describe('decode_x402_payment_payload (pure)', () => {
+  it('decodes a well-formed canonical V2 payload', async () => {
+    const canonical = {
+      x402Version: 2,
+      scheme: 'exact',
+      network: 'eip155:8453',
+      payload: {
+        signature: '0x' + '00'.repeat(65),
+        authorization: {
+          from: '0x549c82e6bFC54bdaE9A2073744CBC2AF5D1FC6D1',
+          to: '0x549c82e6bFC54bdaE9A2073744CBC2AF5D1FC6D1',
+          value: '20000',
+          validAfter: '0',
+          validBefore: '99999999999',
+          nonce: '0x' + '11'.repeat(32),
+        },
+      },
+    };
+    const b64 = Buffer.from(JSON.stringify(canonical)).toString('base64');
+    const result = await decode_x402_payment_payload({ payload: b64 });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.x402_version).toBe(2);
+      expect(result.scheme).toBe('exact');
+      expect(result.network).toBe('eip155:8453');
+      expect(result.canonical_shape_ok).toBe(true);
+      expect(result.shape_warnings).toEqual([]);
+    }
+  });
+
+  it('flags shape warnings for missing fields', async () => {
+    const b64 = Buffer.from(JSON.stringify({ scheme: 'exact' })).toString('base64');
+    const result = await decode_x402_payment_payload({ payload: b64 });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.canonical_shape_ok).toBe(false);
+      expect(result.shape_warnings.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('returns validation_failed on non-JSON payload', async () => {
+    const b64 = Buffer.from('not json at all').toString('base64');
+    const result = await decode_x402_payment_payload({ payload: b64 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.details.code).toBe('not-json');
+  });
+
+  it('returns validation_failed on JSON array (not object)', async () => {
+    const b64 = Buffer.from(JSON.stringify([1, 2, 3])).toString('base64');
+    const result = await decode_x402_payment_payload({ payload: b64 });
+    expect(result.ok).toBe(false);
+  });
+});
+
 describe('x402 tools (input validation)', () => {
   it('verify_x402_settlement rejects bad tx hash', async () => {
     await expect(
@@ -125,5 +206,21 @@ describe('x402 tools (input validation)', () => {
 
   it('parse_x402_manifest rejects localhost (SSRF guard)', async () => {
     await expect(parse_x402_manifest({ domain: 'localhost' })).rejects.toThrow();
+  });
+
+  it('probe_x402_endpoint rejects http:// (SSRF guard)', async () => {
+    await expect(probe_x402_endpoint({ url: 'http://tensorfeed.ai/api/meta' })).rejects.toThrow();
+  });
+
+  it('probe_x402_endpoint rejects localhost (SSRF guard)', async () => {
+    await expect(probe_x402_endpoint({ url: 'https://localhost/api' })).rejects.toThrow();
+  });
+
+  it('probe_x402_endpoint rejects file:// (SSRF guard)', async () => {
+    await expect(probe_x402_endpoint({ url: 'file:///etc/passwd' })).rejects.toThrow();
+  });
+
+  it('decode_x402_payment_payload rejects non-base64 input', async () => {
+    await expect(decode_x402_payment_payload({ payload: 'not!base64!@#' })).rejects.toThrow();
   });
 });

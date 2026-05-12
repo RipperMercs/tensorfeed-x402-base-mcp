@@ -115,6 +115,77 @@ export function requireDomain(input: unknown, field = 'domain'): string {
 }
 
 /**
+ * Validates an https:// URL. Rejects http://, file://, javascript:, data:,
+ * raw IP addresses, loopback/private network targets, and anything that
+ * doesn't parse with WHATWG URL. Caps at 2048 chars. Returns the parsed
+ * URL string (origin + pathname + search) without fragment.
+ *
+ * Used for `probe_x402_endpoint` so an agent can ask "is this URL x402-paid?"
+ * without becoming an SSRF vector into the caller's private network.
+ */
+export function requireHttpsUrl(input: unknown, field = 'url'): string {
+  if (typeof input !== 'string') {
+    throw new ValidationError(field, 'must-be-string');
+  }
+  if (input.length === 0 || input.length > 2048) {
+    throw new ValidationError(field, 'bad-length');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(input);
+  } catch {
+    throw new ValidationError(field, 'malformed');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new ValidationError(field, 'must-be-https');
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '127.0.0.1' ||
+    host === '0.0.0.0' ||
+    host === '::1' ||
+    host.startsWith('192.168.') ||
+    host.startsWith('10.') ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+    /^169\.254\./.test(host)
+  ) {
+    throw new ValidationError(field, 'private-or-loopback-blocked');
+  }
+  if (!/\.[a-z]{2,}$/i.test(host)) {
+    throw new ValidationError(field, 'malformed-host');
+  }
+  parsed.hash = '';
+  return parsed.toString();
+}
+
+/**
+ * Validates a base64-encoded blob (standard or URL-safe). Caps decoded
+ * length at 64 KB to prevent memory bloat. Returns the decoded Buffer.
+ */
+export function requireBase64(input: unknown, field = 'payload', maxBytes = 64 * 1024): Buffer {
+  if (typeof input !== 'string') {
+    throw new ValidationError(field, 'must-be-string');
+  }
+  if (input.length === 0) {
+    throw new ValidationError(field, 'empty');
+  }
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) {
+    throw new ValidationError(field, 'not-base64');
+  }
+  const decoded = Buffer.from(normalized, 'base64');
+  if (decoded.length === 0) {
+    throw new ValidationError(field, 'decoded-empty');
+  }
+  if (decoded.length > maxBytes) {
+    throw new ValidationError(field, 'decoded-too-large');
+  }
+  return decoded;
+}
+
+/**
  * Validates a positive integer within bounds. Used for block ranges.
  */
 export function requireUint(input: unknown, field: string, min = 0, max = 1_000_000): number {

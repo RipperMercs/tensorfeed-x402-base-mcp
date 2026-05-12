@@ -74,6 +74,8 @@ Affiliate links if you don't already have an account:
 | `verify_x402_settlement` | Given a tx hash, expected recipient, and expected USDC amount, returns a structured verdict on whether the on-chain Transfer event matches. |
 | `parse_x402_manifest` | Fetches `https://{domain}/.well-known/x402.json`, returns the structured manifest. |
 | `usdc_recent_payments_to` | USDC transfers TO an address over N blocks; the merchant-side view. |
+| `probe_x402_endpoint` | Probes any https URL and reports whether it returns a canonical x402-paid 402 response with `accepts[]`. |
+| `decode_x402_payment_payload` | Offline decode of a base64 `X-PAYMENT` header (Coinbase x402 V2): returns scheme, network, version, EIP-3009 authorization, signature. |
 
 ### TensorFeed flavor
 
@@ -81,6 +83,8 @@ Affiliate links if you don't already have an account:
 |------|-------------|
 | `verify_afta_federation` | Calls TensorFeed's AFTA certification endpoint for a domain, returns a scored checklist. |
 | `tf_payment_lookup` | Checks whether a tx hash is a USDC payment to TensorFeed's canonical wallet on Base. |
+| `x402_publisher_health` | Returns current outcome + 24h/7d uptime + recent series for a domain monitored by TensorFeed's hourly x402 status probe. |
+| `afta_federation_members` | Returns the canonical curated list of confirmed AFTA federation members (TF origin + federated members). |
 
 ## Examples
 
