@@ -1,0 +1,59 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-latest.schema.json",
+  "manifest_version": "0.3",
+  "name": "tensorfeed-x402-base-mcp",
+  "display_name": "TensorFeed x402 Base Reader",
+  "version": "0.1.2",
+  "description": "Read-only Base mainnet chain reader for x402 payment verification and AFTA federation helpers.",
+  "long_description": "Read-only Model Context Protocol server purpose-built for verifying x402 payment settlements on Base mainnet. Eleven tools, zero private keys, zero broadcasts.\n\nGeneric Base reads: native ETH balance, USDC balance (Circle bridged), block number, transaction receipts, eth_call against any contract, recent USDC Transfer events for an address.\n\nx402-native verification: independently verify on-chain that a USDC settlement matches a claimed x402 payment receipt (recipient + amount), parse publisher /.well-known/x402 manifests, list recent USDC payments to a merchant address.\n\nAFTA federation: check the Agent Fair-Trade Agreement certification status of any domain, look up whether a transaction hash is a USDC payment to TensorFeed's canonical wallet.\n\nNo private keys are required or accepted. The server cannot sign transactions, broadcast, or move funds. Every tool is read-only. Outputs are sanitized (control chars stripped, lengths capped at 50 KB) so malicious chain data cannot be used to inject content into the calling agent's reasoning. The package is published with cryptographic provenance attestations via GitHub Actions OIDC; verify with npm audit signatures.\n\nDefault RPC endpoint is public Base mainnet (mainnet.base.org). Self-hosters can supply an Alchemy or Infura URL via TENSORFEED_RPC_URL for higher rate limits; non-allowlisted URLs are rejected at startup.",
+  "author": {
+    "name": "TensorFeed.ai",
+    "url": "https://github.com/RipperMercs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RipperMercs/tensorfeed-x402-base-mcp"
+  },
+  "homepage": "https://tensorfeed.ai/x402",
+  "documentation": "https://github.com/RipperMercs/tensorfeed-x402-base-mcp#readme",
+  "support": "https://github.com/RipperMercs/tensorfeed-x402-base-mcp/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {}
+    }
+  },
+  "tools_generated": true,
+  "keywords": [
+    "x402",
+    "base",
+    "ethereum",
+    "evm",
+    "usdc",
+    "agent-payments",
+    "afta",
+    "verification",
+    "read-only",
+    "tensorfeed"
+  ],
+  "license": "MIT",
+  "privacy_policies": [
+    "https://tensorfeed.ai/privacy"
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+# Files unrelated to runtime that mcpb should not bundle.
+# The MCP server only needs dist/, manifest.json, icon.png, package.json,
+# README, LICENSE, and the production node_modules (mcpb prunes dev deps).
+
+src/
+tests/
+tsconfig.json
+vitest.config.ts
+server.json
+.gitignore
+.git/
+.github/
+.env
+.env.example
+*.tsbuildinfo
+**/*.test.js
+**/*.test.ts
+**/*.map
+.mcpbignore
+tensorfeed-x402-base-mcp.mcpb
+tensorfeed-x402-base-mcp-*.mcpb

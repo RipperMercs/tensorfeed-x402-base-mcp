@@ -1,6 +1,6 @@
 {
   "name": "@tensorfeed/x402-base-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "mcpName": "ai.tensorfeed/x402-base-mcp",
   "description": "Read-only MCP server for x402 payment verification on Base mainnet. The x402 ecosystem's canonical chain reader, with AFTA federation helpers.",
   "type": "module",
@@ -13,7 +13,11 @@
     "dist",
     "README.md",
     "SECURITY.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md",
+    "manifest.json",
+    "icon.png",
+    "server.json"
   ],
   "scripts": {
     "build": "tsc",
@@ -37,10 +41,10 @@
   ],
   "author": "Pizza Robot Studios",
   "license": "MIT",
-  "homepage": "https://tensorfeed.ai",
+  "homepage": "https://tensorfeed.ai/x402",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RipperMercs/tensorfeed-x402-base-mcp.git"
+    "url": "https://github.com/RipperMercs/tensorfeed-x402-base-mcp"
   },
   "bugs": {
     "url": "https://github.com/RipperMercs/tensorfeed-x402-base-mcp/issues"
