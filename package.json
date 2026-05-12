@@ -1,0 +1,65 @@
+{
+  "name": "@tensorfeed/x402-base-mcp",
+  "version": "0.1.0",
+  "description": "Read-only MCP server for x402 payment verification on Base mainnet. The x402 ecosystem's canonical chain reader, with AFTA federation helpers.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "tensorfeed-x402-base-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "x402",
+    "base",
+    "ethereum",
+    "evm",
+    "usdc",
+    "afta",
+    "agent-payments",
+    "tensorfeed"
+  ],
+  "author": "Pizza Robot Studios",
+  "license": "MIT",
+  "homepage": "https://tensorfeed.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RipperMercs/tensorfeed-x402-base-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RipperMercs/tensorfeed-x402-base-mcp/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "viem": "^2.21.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
