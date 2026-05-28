@@ -1,16 +1,22 @@
 # @tensorfeed/x402-base-mcp
 
-The x402 ecosystem's read MCP for Base. Verify on-chain USDC settlements, parse publisher manifests, and audit x402 payment receipts from any MCP-compatible AI agent.
+Read-only MCP server for verifying x402 USDC settlements on Base mainnet. Drop it into any MCP-compatible agent (Claude Desktop, Claude Code, Cursor, ChatGPT) to independently audit x402 payment receipts on-chain, parse publisher `.well-known/x402` manifests, and check AFTA federation status. No private keys, no signing, no broadcasts.
 
 ```
 npm install -g @tensorfeed/x402-base-mcp
 ```
 
-Read-only. No private keys. Base mainnet first.
+## Relationship to Coinbase Base MCP
 
-## Why this exists
+Coinbase shipped **Base MCP** (the official `mcp.base.org` server, launched May 2026) as the *transact-side* MCP: it connects an agent to a Base Account and lets the agent propose swaps, transfers, and x402 payments that the user approves in-wallet.
 
-x402 is a payment protocol where agents pay merchants in USDC on Base for paid API responses. When an agent receives a payment receipt back, it has two options for verifying that the settlement actually happened the way the receipt claims:
+This package, `@tensorfeed/x402-base-mcp`, is the *verify-side* MCP. Once an x402 payment has been made (by Base MCP, by a server-side `@coinbase/x402` middleware, or by any other x402 client), this server lets the calling agent independently check the on-chain settlement, parse the publisher's `/.well-known/x402` manifest, and audit the receipt. Read-only chain visibility, no wallet.
+
+The two are complementary, not competing. Use Base MCP to pay. Use this MCP to verify.
+
+## Why a separate verify MCP
+
+x402 is a payment protocol where agents pay merchants in USDC on Base for paid API responses. When an agent receives a payment receipt back, it has two options for confirming that the settlement actually happened the way the receipt claims:
 
 1. Trust the merchant
 2. Read the on-chain Transfer event itself
@@ -132,7 +138,8 @@ MIT
 
 ## Related
 
-- [@tensorfeed/mcp-server](https://www.npmjs.com/package/@tensorfeed/mcp-server) - companion package, the TensorFeed data MCP (news, status, models, benchmarks, premium endpoints). Same scope, complementary role: this server verifies x402 payments on-chain; mcp-server wraps the TF data API as MCP tools.
+- [Coinbase Base MCP](https://mcp.base.org) - the official transact-side MCP for Base. Pair with this package for a full pay + verify loop: Base MCP signs the x402 payment, this package independently confirms the settlement on-chain.
+- [@tensorfeed/mcp-server](https://www.npmjs.com/package/@tensorfeed/mcp-server) - companion package, the TensorFeed data MCP (news, status, models, benchmarks, premium endpoints). Complementary role: this server verifies x402 payments on-chain; mcp-server wraps the TF data API as MCP tools.
 - [TensorFeed](https://tensorfeed.ai) - AI ecosystem data layer
 - [TensorFeed developers](https://tensorfeed.ai/developers) - free + premium API for AI agents
 - [Agent Fair-Trade Agreement (AFTA)](https://tensorfeed.ai/agent-fair-trade) - open standard for honest agent commerce

@@ -3,8 +3,8 @@
   "manifest_version": "0.3",
   "name": "tensorfeed-x402-base-mcp",
   "display_name": "TensorFeed x402 Base Reader",
-  "version": "0.2.0",
-  "description": "Read-only Base mainnet chain reader for x402 payment verification and AFTA federation helpers.",
+  "version": "0.2.1",
+  "description": "Read-only Base mainnet chain reader for x402 payment verification and AFTA federation helpers. Verify-side companion to Coinbase Base MCP.",
   "long_description": "Read-only Model Context Protocol server purpose-built for verifying x402 payment settlements on Base mainnet. Fifteen tools, zero private keys, zero broadcasts.\n\nGeneric Base reads: native ETH balance, USDC balance (Circle bridged), block number, transaction receipts, eth_call against any contract, recent USDC Transfer events for an address.\n\nx402-native verification: independently verify on-chain that a USDC settlement matches a claimed x402 payment receipt, parse publisher /.well-known/x402 manifests, list recent USDC payments to a merchant address, probe an arbitrary URL to detect canonical x402-paid responses, decode base64 X-PAYMENT header payloads offline.\n\nAFTA federation: check the Agent Fair-Trade Agreement certification status of any domain, look up whether a transaction hash is a USDC payment to TensorFeed's canonical wallet, list known AFTA federation members, fetch the publisher health and uptime record for any monitored x402 domain.\n\nNo private keys are required or accepted. The server cannot sign transactions, broadcast, or move funds. Every tool is read-only. Outputs are sanitized (control chars stripped, lengths capped at 50 KB) so malicious chain data cannot be used to inject content into the calling agent's reasoning. The package is published with cryptographic provenance attestations via GitHub Actions OIDC; verify with npm audit signatures.\n\nDefault RPC endpoint is public Base mainnet (mainnet.base.org). Self-hosters can supply an Alchemy or Infura URL via TENSORFEED_RPC_URL for higher rate limits; non-allowlisted URLs are rejected at startup.",
   "author": {
     "name": "TensorFeed.ai",

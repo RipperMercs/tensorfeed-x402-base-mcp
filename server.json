@@ -3,7 +3,7 @@
   "name": "ai.tensorfeed/x402-base-mcp",
   "title": "TensorFeed x402 Base Reader",
   "description": "Read-only Base mainnet reader. Verifies x402 payment settlements + AFTA federation status.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "websiteUrl": "https://tensorfeed.ai/x402",
   "repository": {
     "url": "https://github.com/RipperMercs/tensorfeed-x402-base-mcp",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@tensorfeed/x402-base-mcp",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
