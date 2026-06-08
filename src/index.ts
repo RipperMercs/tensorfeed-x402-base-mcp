@@ -37,8 +37,40 @@ import {
 import { safeRun } from './security/errors.js';
 import { sanitizeValue } from './security/sanitize.js';
 import { enforceResponseCap, MAX_RESPONSE_BYTES } from './security/limits.js';
+import packageJson from '../package.json' with { type: 'json' };
 
-const PACKAGE_VERSION = '0.2.0';
+const PACKAGE_VERSION = packageJson.version;
+
+function printHelp(): void {
+  console.error(`tensorfeed-x402-base-mcp ${PACKAGE_VERSION}
+
+Read-only MCP server for verifying x402 USDC settlements on Base mainnet.
+
+Usage:
+  tensorfeed-x402-base-mcp [options]
+
+Options:
+  -h, --help       Show this help message
+  -v, --version    Show package version`);
+}
+
+function handleCliMetadataFlags(args: string[]): boolean {
+  if (args.includes('--version') || args.includes('-v')) {
+    console.error(PACKAGE_VERSION);
+    return true;
+  }
+
+  if (args.includes('--help') || args.includes('-h')) {
+    printHelp();
+    return true;
+  }
+
+  return false;
+}
+
+if (handleCliMetadataFlags(process.argv.slice(2))) {
+  process.exit(0);
+}
 
 const server = new McpServer({
   name: 'tensorfeed-x402-base-mcp',
