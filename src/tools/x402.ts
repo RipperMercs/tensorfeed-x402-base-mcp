@@ -27,8 +27,13 @@ import {
   requireHttpsUrl,
   requireBase64,
 } from '../security/validate.js';
-import { sanitizeString, sanitizeValue, externalString } from '../security/sanitize.js';
-import { getClient, cached, rateLimit, CACHE_TTL } from '../rpc/client.js';
+import {
+  sanitizeString,
+  sanitizeValue,
+  EXTERNAL_ORIGIN,
+  EXTERNAL_CONTENT_NOTICE,
+} from '../security/sanitize.js';
+import { getClient, cached, rateLimit, assertBaseChain, CACHE_TTL } from '../rpc/client.js';
 import { USDC_ADDRESS, USDC_DECIMALS, ERC20_ABI, BASE_CAIP2 } from '../chains.js';
 
 const WELL_KNOWN_X402_PATHS = ['/.well-known/x402.json', '/.well-known/x402'];
@@ -72,6 +77,7 @@ export async function verify_x402_settlement(args: {
   const expectedRaw = parseUnits(amountStr, USDC_DECIMALS);
 
   await rateLimit('verify_x402_settlement');
+  await assertBaseChain();
   const receipt = await cached(`receipt:${txHash}`, CACHE_TTL.RECEIPT, async () => {
     try {
       return await getClient().getTransactionReceipt({ hash: txHash });
@@ -169,7 +175,8 @@ export async function verify_x402_settlement(args: {
  *
  * Fetches and parses a publisher's /.well-known/x402.json. Returns the
  * structured manifest if found. The response is sanitized (control chars
- * stripped, fields capped). External strings carry an _origin marker.
+ * stripped, fields capped) and the manifest is marked _origin: "external",
+ * since every byte of it is controlled by the publisher being queried.
  *
  * Used by agents to discover what an x402-paid publisher accepts.
  */
@@ -210,6 +217,8 @@ export async function parse_x402_manifest(args: { domain: unknown }) {
           source_url: url,
           fetched_at: new Date().toISOString(),
           manifest: sanitizeValue(data),
+          _origin: EXTERNAL_ORIGIN,
+          content_notice: EXTERNAL_CONTENT_NOTICE,
         };
       } catch (e) {
         // Try next path
@@ -238,6 +247,7 @@ export async function usdc_recent_payments_to(args: {
   const address = requireAddress(args.address);
   const blocksBack = requireUint(args.blocks_back ?? 1000, 'blocks_back', 1, 10_000);
   await rateLimit('usdc_recent_payments_to');
+  await assertBaseChain();
 
   const client = getClient();
   const latest = await cached('block_number', CACHE_TTL.BLOCK_NUMBER, async () => client.getBlockNumber());
@@ -379,6 +389,8 @@ export async function probe_x402_endpoint(args: { url: unknown }) {
         reason: '402_body_missing_accepts',
         http_status: status,
         body_preview: sanitizeValue(body),
+        _origin: EXTERNAL_ORIGIN,
+        content_notice: EXTERNAL_CONTENT_NOTICE,
       };
     }
 
@@ -392,6 +404,8 @@ export async function probe_x402_endpoint(args: { url: unknown }) {
         : null,
       accepts_count: accepts.length,
       accepts: sanitizeValue(accepts),
+      _origin: EXTERNAL_ORIGIN,
+      content_notice: EXTERNAL_CONTENT_NOTICE,
     };
   });
 }

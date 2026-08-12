@@ -14,8 +14,8 @@
 
 import { formatUnits, parseEventLogs, type Address } from 'viem';
 import { requireDomain, requireTxHash } from '../security/validate.js';
-import { sanitizeValue, externalString, sanitizeString } from '../security/sanitize.js';
-import { getClient, cached, rateLimit, CACHE_TTL } from '../rpc/client.js';
+import { sanitizeValue, sanitizeString } from '../security/sanitize.js';
+import { getClient, cached, rateLimit, assertBaseChain, CACHE_TTL } from '../rpc/client.js';
 import { USDC_ADDRESS, USDC_DECIMALS, ERC20_ABI, BASE_CAIP2 } from '../chains.js';
 
 // TF's canonical Base mainnet payment wallet. This is the wallet that
@@ -136,6 +136,7 @@ export async function verify_afta_federation(args: { domain: unknown }) {
 export async function tf_payment_lookup(args: { tx_hash: unknown }) {
   const txHash = requireTxHash(args.tx_hash);
   await rateLimit('tf_payment_lookup');
+  await assertBaseChain();
 
   const receipt = await cached(`receipt:${txHash}`, CACHE_TTL.RECEIPT, async () => {
     try {

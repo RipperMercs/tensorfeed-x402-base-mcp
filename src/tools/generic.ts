@@ -16,7 +16,7 @@ import {
   requireUint,
 } from '../security/validate.js';
 import { sanitizeValue } from '../security/sanitize.js';
-import { getClient, cached, rateLimit, CACHE_TTL } from '../rpc/client.js';
+import { getClient, cached, rateLimit, assertBaseChain, CACHE_TTL } from '../rpc/client.js';
 import { USDC_ADDRESS, USDC_DECIMALS, ERC20_ABI } from '../chains.js';
 
 // ----- balance (native ETH) -----
@@ -33,6 +33,7 @@ export interface BalanceResult {
 export async function balance(args: { address: unknown }): Promise<BalanceResult> {
   const address = requireAddress(args.address);
   await rateLimit('balance');
+  await assertBaseChain();
   const wei = await cached(`balance:${address}`, CACHE_TTL.BALANCE, async () => {
     return getClient().getBalance({ address });
   });
@@ -61,6 +62,7 @@ export interface UsdcBalanceResult {
 export async function usdc_balance(args: { address: unknown }): Promise<UsdcBalanceResult> {
   const address = requireAddress(args.address);
   await rateLimit('usdc_balance');
+  await assertBaseChain();
   const raw = await cached(`usdc_balance:${address}`, CACHE_TTL.BALANCE, async () => {
     return getClient().readContract({
       address: USDC_ADDRESS,
@@ -84,6 +86,7 @@ export async function usdc_balance(args: { address: unknown }): Promise<UsdcBala
 
 export async function block_number(): Promise<{ ok: true; network: 'base-mainnet'; block: string }> {
   await rateLimit('block_number');
+  await assertBaseChain();
   const bn = await cached('block_number', CACHE_TTL.BLOCK_NUMBER, async () => {
     return getClient().getBlockNumber();
   });
@@ -95,6 +98,7 @@ export async function block_number(): Promise<{ ok: true; network: 'base-mainnet
 export async function get_tx_receipt(args: { tx_hash: unknown }) {
   const hash = requireTxHash(args.tx_hash);
   await rateLimit('get_tx_receipt');
+  await assertBaseChain();
   const receipt = await cached(`receipt:${hash}`, CACHE_TTL.RECEIPT, async () => {
     try {
       return await getClient().getTransactionReceipt({ hash });
@@ -135,6 +139,7 @@ export async function call(args: { contract: unknown; data: unknown }) {
   const contract = requireAddress(args.contract, 'contract');
   const data = requireHexCalldata(args.data, 'data');
   await rateLimit('call');
+  await assertBaseChain();
   const result = await cached(`call:${contract}:${data}`, CACHE_TTL.CONTRACT_CALL, async () => {
     return getClient().call({ to: contract, data });
   });
@@ -171,6 +176,7 @@ export async function recent_transfers(args: {
       ? (args.direction as 'in' | 'out' | 'both')
       : 'both';
   await rateLimit('recent_transfers');
+  await assertBaseChain();
 
   const client = getClient();
   const latest = await cached('block_number', CACHE_TTL.BLOCK_NUMBER, async () => client.getBlockNumber());

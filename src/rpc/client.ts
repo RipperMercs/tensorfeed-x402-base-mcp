@@ -12,7 +12,7 @@
  */
 
 import { createPublicClient, http } from 'viem';
-import { BASE_CHAIN } from '../chains.js';
+import { BASE_CHAIN, BASE_CHAIN_ID, ChainMismatchError } from '../chains.js';
 import { resolveRpcUrl } from './allowlist.js';
 
 function makeClient() {
@@ -37,9 +37,50 @@ export function getClient(): BaseClient {
   return _client;
 }
 
+/**
+ * Memoized chain-identity check.
+ *
+ * The RPC allowlist constrains which HOST we will talk to, but not which CHAIN
+ * that host serves. Providers like Alchemy and Infura serve every network off
+ * the same allowlisted domain, so base-sepolia.g.alchemy.com passes the
+ * allowlist exactly as base-mainnet.g.alchemy.com does. Since an EVM address is
+ * the same on every chain, a testnet-pointed RPC would let free testnet USDC
+ * sent to the real payment wallet verify as a genuine mainnet settlement. Every
+ * answer this server gives depends on being on chain 8453, so we ask the node
+ * directly and refuse to answer if it is not.
+ *
+ * Called once per process. The resolved promise is cached, so the extra
+ * eth_chainId costs one request for the lifetime of the server.
+ *
+ * A mismatch caches the REJECTION deliberately: the configuration is wrong and
+ * retrying cannot fix it, so every later call fails closed without hammering
+ * the RPC. A transient network failure clears the memo so the next call can
+ * retry, since that one genuinely might succeed.
+ */
+let _chainVerified: Promise<void> | null = null;
+
+export function assertBaseChain(): Promise<void> {
+  if (!_chainVerified) {
+    _chainVerified = (async () => {
+      let actual: number;
+      try {
+        actual = await getClient().getChainId();
+      } catch (err) {
+        _chainVerified = null;
+        throw err;
+      }
+      if (actual !== BASE_CHAIN_ID) {
+        throw new ChainMismatchError(actual);
+      }
+    })();
+  }
+  return _chainVerified;
+}
+
 /** Reset cached client. Test-only. */
 export function _resetClient(): void {
   _client = null;
+  _chainVerified = null;
 }
 
 // -------- in-memory cache --------

@@ -15,6 +15,7 @@
 
 import { ValidationError } from './validate.js';
 import { ResponseTooLargeError } from './limits.js';
+import { ChainMismatchError } from '../chains.js';
 
 export interface SafeErrorResponse {
   ok: false;
@@ -24,6 +25,8 @@ export interface SafeErrorResponse {
     code?: string;
     limit?: number;
     actual?: number;
+    expected?: number;
+    hint?: string;
   };
 }
 
@@ -32,6 +35,23 @@ export interface SafeErrorResponse {
  * suitable to return from an MCP tool.
  */
 export function formatError(err: unknown): SafeErrorResponse {
+  // Surfaced explicitly rather than collapsed into internal_error. A chain
+  // mismatch means every settlement answer this server could give would be
+  // read off the wrong ledger, so the caller needs to know that specifically,
+  // and the operator needs to know their RPC config is wrong. The chain ids
+  // are our own constants and the node's reported id, not caller input, so
+  // there is nothing attacker-controlled to echo here.
+  if (err instanceof ChainMismatchError) {
+    return {
+      ok: false,
+      error: 'chain_mismatch',
+      details: {
+        expected: err.expected,
+        actual: err.actual ?? undefined,
+        hint: 'TENSORFEED_RPC_URL points at a node that is not Base mainnet. Settlement verification is refused until it does.',
+      },
+    };
+  }
   if (err instanceof ValidationError) {
     return {
       ok: false,

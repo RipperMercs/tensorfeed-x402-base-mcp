@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+Two fixes from a security review prompted by the August 2026 GhostSplice research on splitting instructions across MCP channels. This server was never a vector for that attack (it never requests sampling, its tool descriptions are static literals, and every value that can flow back in as a tool argument is allowlist-validated), but the review surfaced a real problem next door.
+
+- **Chain-identity check before any settlement answer.** `BASE_CHAIN_ID` was declared and never used. The RPC allowlist constrains which host we talk to but not which chain that host serves, and providers like Alchemy, Infura, and dRPC serve every network off the same allowlisted domain, so `base-sepolia.g.alchemy.com` passed every existing check. Because an EVM address is identical on every chain, an RPC pointed at Base Sepolia would confirm a free testnet USDC transfer to the real payment wallet as a genuine mainnet settlement, which is the one thing this server exists to rule out. Every chain-reading tool now calls a memoized `assertBaseChain()` that asks the node for its chain id and refuses to answer unless it is 8453. Verified against a live testnet RPC: `https://base-sepolia.drpc.org` passes the host allowlist and is now rejected with `chain_mismatch` (expected 8453, actual 84532). Costs one `eth_chainId` per process. A mismatch caches the rejection so a misconfigured server fails closed instead of hammering the RPC; a transient network error clears the memo so it can retry.
+- **Publisher-controlled payloads are now actually marked.** `externalString()` was imported by `tools/tf.ts` and `tools/x402.ts`, unit-tested, and never called, while `parse_x402_manifest`'s doc comment claimed "External strings carry an `_origin` marker." They did not. `parse_x402_manifest` and `probe_x402_endpoint` both relay entire third-party JSON bodies into the calling agent's context, so those responses now carry `_origin: "external"` and a `content_notice` saying to treat the payload as data rather than instructions. Marking is container-level rather than per string, because rewriting every leaf of a manifest into `{value,_origin}` would destroy the structure the agent needs to read. The stale doc claim is corrected and the unused imports are gone.
+- 10 new offline tests (89 offline, 124 passing overall).
+
 ## 0.2.1 - 2026-05-27
 
 Positioning update for the Coinbase Base MCP launch (mcp.base.org, May 2026). No code changes; documentation and metadata only.

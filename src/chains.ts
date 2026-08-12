@@ -54,3 +54,28 @@ export const ERC20_ABI = [
     ],
   },
 ] as const;
+
+/**
+ * Thrown when the configured RPC endpoint is not serving Base mainnet.
+ *
+ * This matters more here than it would on a general-purpose EVM server.
+ * Every verdict this server returns is of the form "yes, that USDC payment
+ * really settled." An EVM address is identical on every chain, so an RPC
+ * pointed at Base Sepolia would happily confirm a worthless testnet transfer
+ * to the real payment wallet as a genuine settlement. The SSRF allowlist in
+ * rpc/allowlist.ts cannot catch that, because base-sepolia.g.alchemy.com is a
+ * perfectly legitimate host on an allowed provider. The chain id is the only
+ * thing that actually distinguishes the two, so it gets checked directly.
+ */
+export class ChainMismatchError extends Error {
+  readonly expected: number;
+  readonly actual: number | null;
+  constructor(actual: number | null) {
+    super(
+      `configured RPC is not Base mainnet (expected chain id ${BASE_CHAIN_ID}, got ${actual ?? 'unknown'})`,
+    );
+    this.name = 'ChainMismatchError';
+    this.expected = BASE_CHAIN_ID;
+    this.actual = actual;
+  }
+}
