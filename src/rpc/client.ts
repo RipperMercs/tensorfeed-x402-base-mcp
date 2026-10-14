@@ -11,11 +11,11 @@
  * (the cap belongs upstream at the provider) but we smooth bursts.
  */
 
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, http, type HttpTransport, type PublicClient } from 'viem';
 import { BASE_CHAIN, BASE_CHAIN_ID, ChainMismatchError } from '../chains.js';
 import { resolveRpcUrl } from './allowlist.js';
 
-function makeClient() {
+function makeClient(): PublicClient<HttpTransport, typeof BASE_CHAIN> {
   const url = resolveRpcUrl(process.env.TENSORFEED_RPC_URL);
   return createPublicClient({
     chain: BASE_CHAIN,
